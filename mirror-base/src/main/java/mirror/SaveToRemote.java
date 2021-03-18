@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 
+import com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +51,7 @@ public class SaveToRemote implements TaskLogic {
   private void sendToRemote(Update update) {
     try {
       Update.Builder b = Update.newBuilder(update).setLocal(false);
-      if (!update.getDirectory() && update.getSymlink().isEmpty() && !update.getDelete()) {
+      if (!update.getDirectory() && update.getSymlink().isEmpty() && !update.getDelete() && b.getData() != ByteString.EMPTY) {
         b.setData(fileAccess.read(Paths.get(update.getPath())));
       }
       String maybeDelete = update.getDelete() ? "(delete) " : "";
