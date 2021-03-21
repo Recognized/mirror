@@ -29,6 +29,7 @@ public class MirrorClient {
   private static final Logger log = LoggerFactory.getLogger(MirrorClient.class);
 
   private final MirrorPaths paths;
+  private final String remoteKey;
   private final TaskFactory taskFactory;
   private final ConnectionDetector detector;
   private final FileWatcherFactory watcherFactory;
@@ -39,6 +40,7 @@ public class MirrorClient {
 
   public MirrorClient(
     MirrorPaths paths,
+    String remoteKey,
     TaskFactory taskFactory,
     ConnectionDetector detector,
     FileWatcherFactory watcherFactory,
@@ -50,6 +52,7 @@ public class MirrorClient {
     this.watcherFactory = watcherFactory;
     this.fileAccess = fileAccess;
     this.channelFactory = channelFactory;
+    this.remoteKey = remoteKey;
   }
 
   /** Connects to the server and starts a sync session. */
@@ -95,7 +98,7 @@ public class MirrorClient {
       // one of our RPC methods is streaming, then this one is as well
       InitialSyncRequest.Builder req = InitialSyncRequest
         .newBuilder()
-        .setRemotePath(paths.remoteRoot.toString())
+        .setRemoteKey(remoteKey)
         .setClientId(getClientId())
         .setVersion(Mirror.getVersion())
         .addAllState(localState);

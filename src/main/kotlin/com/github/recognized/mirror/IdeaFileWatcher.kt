@@ -33,13 +33,14 @@ import java.util.concurrent.BlockingQueue
 
 class IdeaProjectFileWatcher(
         private val project: Project,
+        parent: Disposable,
         private val queue: BlockingQueue<Update>
 ) : FileWatcher, Disposable {
     private val basePath = project.basePath ?: error("Project is required to have base path")
     private val log = LoggerFactory.getLogger(IdeaProjectFileWatcher::class.java)
 
     init {
-        Disposer.register(project, this)
+        Disposer.register(parent, this)
     }
 
     override fun dispose() {}

@@ -48,22 +48,26 @@ public class MirrorServer extends MirrorImplBase {
   private final TaskFactory taskFactory;
   private final FileWatcherFactory watcherFactory;
   private final FileAccessFactory fileAccessFactory;
-  private final FileAccess root;
+  private final Map<String, String> mounts;
 
-  public MirrorServer(TaskFactory taskFactory, FileAccessFactory fileAccessFactory, FileWatcherFactory watcherFactory) {
-    this(taskFactory, fileAccessFactory, watcherFactory, fileAccessFactory.newFileAccess(Paths.get("./")));
-  }
-
-  public MirrorServer(TaskFactory taskFactory, FileAccessFactory fileAccessFactory, FileWatcherFactory watcherFactory, FileAccess root) {
+  public MirrorServer(TaskFactory taskFactory, FileAccessFactory fileAccessFactory, FileWatcherFactory watcherFactory, Map<String, String> mounts) {
     this.taskFactory = taskFactory;
     this.fileAccessFactory = fileAccessFactory;
     this.watcherFactory = watcherFactory;
-    this.root = root;
+    this.mounts = mounts;
   }
 
   @Override
   public synchronized void timeCheck(TimeCheckRequest request, StreamObserver<TimeCheckResponse> responseObserver) {
     sendErrorIfClockDriftExists(request, responseObserver);
+  }
+
+  public synchronized Map<String, MirrorSession> getSessions() {
+    return sessions;
+  }
+
+  public synchronized Map<String, String> getMounts() {
+    return mounts;
   }
 
   @Override
@@ -73,14 +77,13 @@ public class MirrorServer extends MirrorImplBase {
     }
 
     MirrorPaths paths = new MirrorPaths(
-      Paths.get(request.getRemotePath()).toAbsolutePath(),
-      null,
+      Paths.get(mounts.get(request.getRemoteKey())).toAbsolutePath(),
       new PathRules(request.getIncludesList()),
       new PathRules(request.getExcludesList()),
       request.getDebugAll(),
       request.getDebugPrefixesList());
 
-    String sessionId = request.getRemotePath() + ":" + request.getClientId();
+    String sessionId = request.getRemoteKey() + ":" + request.getClientId();
     if (sessions.get(sessionId) != null) {
       log.info("Stopping prior session " + sessionId);
       sessions.get(sessionId).stop();
@@ -176,8 +179,8 @@ public class MirrorServer extends MirrorImplBase {
   }
 
   private boolean sendErrorIfRequestedPathDoesNotExist(InitialSyncRequest request, StreamObserver<InitialSyncResponse> responseObserver) {
-    if (!root.exists(Paths.get(request.getRemotePath()))) {
-      String errorMessage = "Path " + request.getRemotePath() + " does not exist on the server";
+    if (!mounts.containsKey(request.getRemoteKey())) {
+      String errorMessage = "Key " + request.getRemoteKey() + " is not exposed on the server";
       log.error(errorMessage + " for " + request.getClientId());
       responseObserver.onNext(InitialSyncResponse.newBuilder().setErrorMessage(errorMessage).build());
       responseObserver.onCompleted();

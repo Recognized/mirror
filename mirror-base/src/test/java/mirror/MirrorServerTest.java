@@ -6,7 +6,9 @@ import static org.junit.Assert.assertThat;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -24,19 +26,25 @@ public class MirrorServerTest {
   private final FileAccessFactory accessFactory = (path) -> sessionFileAccess;
   private final StubTaskFactory taskFactory = new StubTaskFactory();
   private MirrorServer server;
+  private static final Map<String, String> paths = new HashMap<>();
+  private static final String remoteKey = "test";
+  static {
+    paths.put(remoteKey, "home");
+  }
 
   @Before
   public void before() throws Exception {
     Mockito.when(fileWatcherFactory.newWatcher(Mockito.any(), Mockito.any())).thenReturn(fileWatcher);
     Mockito.when(fileWatcher.performInitialScan()).thenReturn(fileUpdates);
-    server = new MirrorServer(taskFactory, accessFactory, fileWatcherFactory, rootFileAccess);
+
+    server = new MirrorServer(taskFactory, accessFactory, fileWatcherFactory, paths);
     rootFileAccess.mkdir(Paths.get("home"));
   }
 
   @Test
   public void shouldStartAValidRequest() {
     // Given a valid initial request
-    InitialSyncRequest request = InitialSyncRequest.newBuilder().setRemotePath("home").build();
+    InitialSyncRequest request = InitialSyncRequest.newBuilder().setRemoteKey("home").build();
     // When the client attempts to connect
     StubObserver<InitialSyncResponse> response = new StubObserver<>();
     server.initialSync(request, response);
@@ -47,7 +55,7 @@ public class MirrorServerTest {
   @Test
   public void shouldWarnAnOlderClient() {
     // Given a valid request with an older client
-    InitialSyncRequest request = InitialSyncRequest.newBuilder().setRemotePath("home").setVersion("older").build();
+    InitialSyncRequest request = InitialSyncRequest.newBuilder().setRemoteKey("home").setVersion("older").build();
     // When the client attempts to connect
     StubObserver<InitialSyncResponse> response = new StubObserver<>();
     server.initialSync(request, response);
@@ -58,7 +66,7 @@ public class MirrorServerTest {
   @Test
   public void shouldRejectRequestsWithABadRootPath() {
     // Given a root path that is invalid
-    InitialSyncRequest request = InitialSyncRequest.newBuilder().setRemotePath("badvalue").build();
+    InitialSyncRequest request = InitialSyncRequest.newBuilder().setRemoteKey("badvalue").build();
     // When the client attempts to connect
     StubObserver<InitialSyncResponse> response = new StubObserver<>();
     server.initialSync(request, response);

@@ -7,6 +7,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
@@ -33,6 +35,11 @@ public class BigIntegrationTest {
   private static final File integrationTestDir = new File("./build/BigIntergrationTest");
   private static final File root1 = new File(integrationTestDir, "root1");
   private static final File root2 = new File(integrationTestDir, "root2");
+  private static final Map<String, String> paths = new HashMap<>();
+  private static final String remoteKey = "test";
+  static {
+    paths.put(remoteKey, root1.toString());
+  }
   private static int nextPort = 10_000;
   private Server rpc;
   private MirrorClient client;
@@ -84,7 +91,7 @@ public class BigIntegrationTest {
     TaskFactory serverTaskFactory = new ThreadBasedTaskFactory();
     FileWatcherFactory watcherFactory = FileWatcherFactory.newFactory(serverTaskFactory);
     FileAccessFactory accessFactory = new NativeFileAccessFactory();
-    MirrorServer server = new MirrorServer(serverTaskFactory, accessFactory, watcherFactory);
+    MirrorServer server = new MirrorServer(serverTaskFactory, accessFactory, watcherFactory, paths);
     // rpc = NettyServerBuilder.forPort(port).addService(server).build();
     rpc = InProcessServerBuilder.forName("mirror" + port).addService(server).build();
     rpc.start();
@@ -96,7 +103,8 @@ public class BigIntegrationTest {
     ChannelFactory cf = () -> InProcessChannelBuilder.forName("mirror" + port).build();
     TaskFactory clientTaskFactory = new ThreadBasedTaskFactory();
     client = new MirrorClient(// 
-      new MirrorPaths(root2.toPath(), root1.toPath(), includes, excludes, false, new ArrayList<>()),
+      new MirrorPaths(root2.toPath(), includes, excludes, false, new ArrayList<>()),
+      remoteKey,
       clientTaskFactory,
       new ConnectionDetector.Impl(cf),
       watcherFactory,

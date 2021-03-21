@@ -8,13 +8,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.Manifest;
 
+import jdk.nashorn.internal.runtime.regexp.joni.Regex;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,12 +149,35 @@ public class Mirror {
     @Option(name = { "-h", "--host" }, description = "host name to listen on, default: " + defaultHost)
     public String host = defaultHost;
 
+    @Option(name = { "-c", "--config" }, description = "config file to declare syncing directories")
+    public String config;
+
+    @Option(name = { "-f", "--folder" }, description = "config file to declare syncing directories")
+    public String folder;
+
     @Override
     protected void runIfChecksOkay() {
       TaskFactory taskFactory = new ThreadBasedTaskFactory();
       FileAccessFactory accessFactory = new NativeFileAccessFactory();
       FileWatcherFactory watcherFactory = FileWatcherFactory.newFactory(taskFactory);
-      MirrorServer server = new MirrorServer(taskFactory, accessFactory, watcherFactory);
+      Map<String, String> paths = new HashMap<>();
+      if (folder != null) {
+        String[] tokens = folder.split("=");
+        assert(tokens.length == 2);
+        paths.put(tokens[0].trim(), tokens[1].trim());
+      }
+      try {
+        Files.newBufferedReader(Paths.get(config)).lines().forEach(line -> {
+          if (!line.isEmpty()) {
+            String[] tokens = line.split("=");
+            assert (tokens.length == 2);
+            paths.put(tokens[0].trim(), tokens[1].trim());
+          }
+        });
+      } catch (IOException ex) {
+        throw new RuntimeException(ex);
+      }
+      MirrorServer server = new MirrorServer(taskFactory, accessFactory, watcherFactory, paths);
 
       Server rpc = NettyServerBuilder
         .forAddress(new InetSocketAddress(host, port))
@@ -188,8 +215,8 @@ public class Mirror {
     @Option(name = { "-l", "--local-root" }, description = "path on the local side to sync, e.g. ./code; either absolute or relative to the directory mirror client was invoked in")
     public String localRoot;
 
-    @Option(name = { "-r", "--remote-root" }, description = "path on the remote side to sync, e.g. ./code; either absolute or relative to the directory mirror server was invoked in")
-    public String remoteRoot;
+    @Option(name = { "-r", "--remote-key" }, description = "key of path declared on remote server")
+    public String remoteKey;
 
     @Option(name = { "-i", "--include" }, description = "pattern of files to sync, even if they are git ignored")
     public List<String> extraIncludes = new ArrayList<>();
@@ -224,8 +251,9 @@ public class Mirror {
         TaskFactory taskFactory = new ThreadBasedTaskFactory();
         FileWatcherFactory watcherFactory = FileWatcherFactory.newFactory(taskFactory);
 
-        MirrorClient client = new MirrorClient(//
-          new MirrorPaths(Paths.get(localRoot), Paths.get(remoteRoot), includes, excludes, debugAll, debugPrefixes),
+        MirrorClient client = new MirrorClient(
+          new MirrorPaths(Paths.get(localRoot), includes, excludes, debugAll, debugPrefixes),
+          remoteKey,
           taskFactory,
           new ConnectionDetector.Impl(channelFactory),
           watcherFactory,

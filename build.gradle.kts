@@ -42,6 +42,8 @@ allprojects {
 dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.15.0")
     implementation(project(":mirror-base"))
+    implementation("io.grpc:grpc-stub:1.35.0")
+    implementation("io.grpc:grpc-netty:1.35.0")
 }
 
 // Configure gradle-intellij-plugin plugin.

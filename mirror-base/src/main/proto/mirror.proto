@@ -27,7 +27,7 @@ message TimeCheckResponse {
 // Message for the client's initial state.
 message InitialSyncRequest {
   string clientId = 6;
-  string remotePath = 1;
+  string remoteKey = 1;
   int64 currentTime = 7 [deprecated=true];
   string version = 8;
   repeated string includes = 3;

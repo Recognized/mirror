@@ -10,19 +10,17 @@ import mirror.UpdateTree.Node;
 public class MirrorPaths {
 
   public final Path root;
-  public final Path remoteRoot;
   private final PathRules includes;
   private final PathRules excludes;
   private final boolean debugAll;
   private final List<String> debugPrefixes;
 
   public static MirrorPaths forTesting(Path local) {
-    return new MirrorPaths(local, null, new PathRules(), new PathRules(), false, new ArrayList<>());
+    return new MirrorPaths(local, new PathRules(), new PathRules(), false, new ArrayList<>());
   }
 
-  public MirrorPaths(Path root, Path remoteRoot, PathRules includes, PathRules excludes, boolean debugAll, List<String> debugPrefixes) {
+  public MirrorPaths(Path root, PathRules includes, PathRules excludes, boolean debugAll, List<String> debugPrefixes) {
     this.root = root;
-    this.remoteRoot = remoteRoot;
     this.includes = includes;
     this.excludes = excludes;
     this.debugAll = debugAll;

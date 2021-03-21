@@ -96,6 +96,10 @@ public class MirrorSession {
     return seedRemote;
   }
 
+  public Queues getQueues() {
+    return queues;
+  }
+
   public void addInitialRemoteUpdates(List<Update> remoteInitialUpdates) {
     remoteInitialUpdates.forEach(u -> {
       // if a file, mark it has an initial sync, so we know not to save it

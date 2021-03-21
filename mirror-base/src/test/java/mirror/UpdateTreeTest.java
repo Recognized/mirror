@@ -315,6 +315,6 @@ public class UpdateTreeTest {
   }
 
   private static UpdateTree newRoot(PathRules includes, PathRules excludes) {
-    return UpdateTree.newRoot(new MirrorPaths(null, null, new PathRules(), new PathRules("build"), false, new ArrayList<>()));
+    return UpdateTree.newRoot(new MirrorPaths(null, new PathRules(), new PathRules("build"), false, new ArrayList<>()));
   }
 }
