@@ -28,8 +28,8 @@ import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.time.Duration
 import java.util.*
-import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.BlockingQueue
+import java.util.concurrent.CountDownLatch
 
 class IdeaProjectFileWatcher(
         private val project: Project,
@@ -37,6 +37,7 @@ class IdeaProjectFileWatcher(
         private val queue: BlockingQueue<Update>
 ) : FileWatcher, Disposable {
     private val basePath = project.basePath ?: error("Project is required to have base path")
+    private val base = Paths.get(basePath)
     private val log = LoggerFactory.getLogger(IdeaProjectFileWatcher::class.java)
 
     init {
@@ -91,37 +92,44 @@ class IdeaProjectFileWatcher(
     }
 
     override fun performInitialScan(): List<Update> {
+        val latch = CountDownLatch(1)
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Performing initial scan", false) {
             override fun run(indicator: ProgressIndicator) {
-                Files.walkFileTree(Paths.get(basePath), object : SimpleFileVisitor<Path>() {
-                    override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
-                        putFile(
-                                dir,
-                                exists = dir.exists(),
-                                mtime = attrs.lastModifiedTime().toMillis(),
-                                isDirectory = true,
-                                isSymlink = attrs.isSymbolicLink,
-                                isExecutable = false
-                        )
-                        return FileVisitResult.CONTINUE
-                    }
+                if (Paths.get(basePath).exists()) {
+                    log.info("Performing initial scan for base path: $basePath")
+                    Files.walkFileTree(Paths.get(basePath), object : SimpleFileVisitor<Path>() {
+                        override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            putFile(
+                                    dir,
+                                    exists = dir.exists(),
+                                    mtime = attrs.lastModifiedTime().toMillis(),
+                                    isDirectory = true,
+                                    isSymlink = attrs.isSymbolicLink,
+                                    isExecutable = false
+                            )
+                            return FileVisitResult.CONTINUE
+                        }
 
-                    override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                        putFile(
-                                file,
-                                exists = file.exists(),
-                                mtime = attrs.lastModifiedTime().toMillis(),
-                                isDirectory = attrs.isDirectory,
-                                isSymlink = attrs.isSymbolicLink,
-                                isExecutable = file.toFile().canExecute()
-                        )
-                        return FileVisitResult.CONTINUE
-                    }
-                })
+                        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            putFile(
+                                    file,
+                                    exists = file.exists(),
+                                    mtime = attrs.lastModifiedTime().toMillis(),
+                                    isDirectory = false,
+                                    isSymlink = attrs.isSymbolicLink,
+                                    isExecutable = file.toFile().canExecute()
+                            )
+                            return FileVisitResult.CONTINUE
+                        }
+                    })
+                }
+                latch.countDown()
             }
         })
+        latch.await()
         val updates = ArrayList<Update>(queue.size)
         queue.drainTo(updates)
+        log.info("Initial updates size: ${updates.size}")
         return updates
     }
 
@@ -133,7 +141,8 @@ class IdeaProjectFileWatcher(
                         isSymlink: Boolean,
                         content: ByteString? = null
     ) {
-        val name = path.fileName.toString()
+        val name = base.relativize(path).toString()
+        log.debug("Put file $name")
         Utils.resetIfInterrupted {
             val ub = Update
                     .newBuilder()
