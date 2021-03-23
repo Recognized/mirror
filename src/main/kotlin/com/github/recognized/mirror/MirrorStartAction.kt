@@ -8,10 +8,8 @@ import com.intellij.openapi.util.Key
 import com.jetbrains.rd.util.firstOrNull
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
-import mirror.Mirror
 import mirror.MirrorServer
 import mirror.MirrorServer.EnableCompressionInterceptor
-import mirror.tasks.ThreadBasedTaskFactory
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 
@@ -31,17 +29,25 @@ class MirrorStartAction : AnAction() {
         val presentation = e.presentation
         with(presentation) {
             description = "Edit mirror settings"
+            icon = Icons.logo
             isEnabled = project != null
             isVisible = project != null
             if (project != null) {
                 val state = project.getUserData(stateKey)
                 when (val s = state?.getCurrentState()) {
                     is Disabled -> {
+                        isEnabled = false
                     }
                     is Synced -> {
+                        icon = Icons.ok
                     }
                     is InProgress -> {
+                        icon = Icons.syncing
                         text = s.message
+                    }
+                    is Error -> {
+                        icon = Icons.error
+                        text = s.error
                     }
                 }
             }
@@ -57,7 +63,10 @@ class MirrorServerWrapper(val server: MirrorServer,
     private var rpc: Server? = null
 
     fun getCurrentState(): MirrorServerState {
-        val session = server.sessions.values.firstOrNull() ?: return Disabled
+        val session = server.sessions.values.firstOrNull() ?: return Synced
+        if (!session.initialized) {
+            return InProgress("Performing initial scan")
+        }
         val incomingUpdates = session.queues.incomingQueue.size
         val outgoingUpdates = session.queues.saveToRemote.size
         return if (incomingUpdates > 0 || outgoingUpdates > 0) {
@@ -90,9 +99,10 @@ class MirrorServerWrapper(val server: MirrorServer,
         rpc?.start()
     }
 
-    val projectKey: String? get() {
-        return server.mounts?.firstOrNull()?.key
-    }
+    val projectKey: String?
+        get() {
+            return server.mounts?.firstOrNull()?.key
+        }
 
     companion object {
         private const val maxMessageSize = 1073741824 // 1gb
@@ -107,3 +117,4 @@ sealed class MirrorServerState
 object Disabled : MirrorServerState()
 object Synced : MirrorServerState()
 class InProgress(val message: String) : MirrorServerState()
+class Error(val error: String) : MirrorServerState()

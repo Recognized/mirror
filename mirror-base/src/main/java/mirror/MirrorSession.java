@@ -1,15 +1,14 @@
 package mirror;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.grpc.StatusRuntimeException;
 import mirror.tasks.TaskFactory;
 import mirror.tasks.TaskLogic;
 import mirror.tasks.TaskPool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Represents a session of an initial sync plus on-going synchronization of
@@ -37,6 +36,7 @@ public class MirrorSession {
   private final SyncLogic syncLogic;
   private volatile SaveToRemote saveToRemote;
   private volatile OutgoingConnection outgoingChanges;
+  public volatile Boolean initialized = false;
 
   public MirrorSession(TaskFactory taskFactory, MirrorPaths paths, FileAccess fileAccess, FileWatcherFactory fileWatcherFactory) {
     this.fileAccess = fileAccess;
@@ -113,6 +113,7 @@ public class MirrorSession {
 
   public void diffAndStartPolling(OutgoingConnection outgoingChanges) {
     this.outgoingChanges = outgoingChanges;
+    initialized = true;
 
     start(syncLogic);
 
